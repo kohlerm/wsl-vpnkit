@@ -1,9 +1,10 @@
 #!/bin/sh
+#modified to work on Ubuntu 22.04 
 
-CMDSHELL="$(command -v cmd.exe || echo '/mnt/c/Windows/system32/cmd.exe')"
+CMDSHELL="/c/WINDOWS/system32/cmd.exe"
 USERPROFILE=$(wslpath "$($CMDSHELL /d /v:off /c 'echo | set /p t=%USERPROFILE%' 2>/dev/null)")
 WSL2_GATEWAY_IP="$(cat /etc/resolv.conf | awk '/^nameserver/ {print $2}')"
-WSL2_VM_IP="$(ifconfig eth0 | awk '/inet /{print substr($2, 6)}')"
+WSL2_VM_IP="$(ifconfig eth0 | awk '/inet /{print substr($2, 1)}')"
 WSL2_TAP_NAME=eth0
 WIN_STORE="/files"
 WIN_PATH="$USERPROFILE/wsl-vpnkit"
@@ -76,6 +77,8 @@ run () {
         -debug="$VPNKIT_DEBUG" &
     VM_PID=$!
     echo "started gvproxy"
+    ip route flush 0/0
+    ip route add default via 192.168.67.1 dev eth1
 }
 
 tap_wait () {
@@ -102,13 +105,13 @@ ipconfig () {
     echo "removed WSL 2 ip route"
 
     echo "adding rules to iptables..."
-    iptables -t nat -A PREROUTING -d $WSL2_GATEWAY_IP/32 -p udp -m udp --dport 53 -j DNAT --to-destination $DNS_IP:53
-    iptables -t nat -A PREROUTING -d $WSL2_GATEWAY_IP/32 -p tcp -m tcp --dport 53 -j DNAT --to-destination $DNS_IP:53
-    iptables -t nat -A PREROUTING -d $WSL2_GATEWAY_IP/32 -j DNAT --to-destination $VPNKIT_HOST_IP
-    iptables -t nat -A OUTPUT -d $WSL2_GATEWAY_IP/32 -p udp -m udp --dport 53 -j DNAT --to-destination $DNS_IP:53
-    iptables -t nat -A OUTPUT -d $WSL2_GATEWAY_IP/32 -p tcp -m tcp --dport 53 -j DNAT --to-destination $DNS_IP:53
-    iptables -t nat -A OUTPUT -d $WSL2_GATEWAY_IP/32 -j DNAT --to-destination $VPNKIT_HOST_IP
-    iptables -t nat -A POSTROUTING -o $TAP_NAME -j MASQUERADE
+    iptables-legacy -t nat -A PREROUTING -d $WSL2_GATEWAY_IP/32 -p udp -m udp --dport 53 -j DNAT --to-destination $DNS_IP:53
+    iptables-legacy -t nat -A PREROUTING -d $WSL2_GATEWAY_IP/32 -p tcp -m tcp --dport 53 -j DNAT --to-destination $DNS_IP:53
+    iptables-legacy -t nat -A PREROUTING -d $WSL2_GATEWAY_IP/32 -j DNAT --to-destination $VPNKIT_HOST_IP
+    iptables-legacy -t nat -A OUTPUT -d $WSL2_GATEWAY_IP/32 -p udp -m udp --dport 53 -j DNAT --to-destination $DNS_IP:53
+    iptables-legacy -t nat -A OUTPUT -d $WSL2_GATEWAY_IP/32 -p tcp -m tcp --dport 53 -j DNAT --to-destination $DNS_IP:53
+    iptables-legacy -t nat -A OUTPUT -d $WSL2_GATEWAY_IP/32 -j DNAT --to-destination $VPNKIT_HOST_IP
+    iptables-legacy -t nat -A POSTROUTING -o $TAP_NAME -j MASQUERADE
     echo "iptables done"
 }
 
@@ -150,10 +153,10 @@ check () {
 
 cleanup () {
     echo "cleaning up iptables..."
-    iptables -t nat -S | grep $VPNKIT_GATEWAY_IP | cut -d " " -f 2- | tr '\n' '\0' | xargs -0 -r -n 1 sh -c 'iptables -t nat -D $1' argv0
-    iptables -t nat -S | grep $VPNKIT_HOST_IP | cut -d " " -f 2- | tr '\n' '\0' | xargs -0 -r -n 1 sh -c 'iptables -t nat -D $1' argv0
-    iptables -t nat -S | grep $TAP_NAME | cut -d " " -f 2- | tr '\n' '\0' | xargs -0 -r -n 1 sh -c 'iptables -t nat -D $1' argv0
-    iptables -t nat -S | grep $DNS_IP | cut -d " " -f 2- | tr '\n' '\0' | xargs -0 -r -n 1 sh -c 'iptables -t nat -D $1' argv0
+    iptables-legacy -t nat -S | grep $VPNKIT_GATEWAY_IP | cut -d " " -f 2- | tr '\n' '\0' | xargs -0 -r -n 1 sh -c 'iptables-legacy -t nat -D $1' argv0
+    iptables-legacy -t nat -S | grep $VPNKIT_HOST_IP | cut -d " " -f 2- | tr '\n' '\0' | xargs -0 -r -n 1 sh -c 'iptables-legacy -t nat -D $1' argv0
+    iptables-legacy -t nat -S | grep $TAP_NAME | cut -d " " -f 2- | tr '\n' '\0' | xargs -0 -r -n 1 sh -c 'iptables-legacy -t nat -D $1' argv0
+    iptables-legacy -t nat -S | grep $DNS_IP | cut -d " " -f 2- | tr '\n' '\0' | xargs -0 -r -n 1 sh -c 'iptables-legacy -t nat -D $1' argv0
     echo "iptables cleanup done"
 
     echo "restoring WSL 2 ip route..."

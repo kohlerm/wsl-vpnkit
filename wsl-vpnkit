@@ -1,8 +1,9 @@
 #!/bin/sh
-#modified to work on Ubuntu 22.04 
 
 CMDSHELL="/c/WINDOWS/system32/cmd.exe"
+
 USERPROFILE=$(wslpath "$($CMDSHELL /d /v:off /c 'echo | set /p t=%USERPROFILE%' 2>/dev/null)")
+
 WSL2_GATEWAY_IP="$(cat /etc/resolv.conf | awk '/^nameserver/ {print $2}')"
 WSL2_VM_IP="$(ifconfig eth0 | awk '/inet /{print substr($2, 1)}')"
 WSL2_TAP_NAME=eth0
@@ -78,7 +79,7 @@ run () {
     VM_PID=$!
     echo "started gvproxy"
     ip route flush 0/0
-    ip route add default via 192.168.67.1 dev eth1
+    ip route add default via $VPNKIT_GATEWAY_IP dev eth1
 }
 
 tap_wait () {
@@ -96,7 +97,7 @@ tap_wait () {
         echo "wsl-vm exited"
         exit 1
     fi
-    echo "dhcp completed"
+ e   echo "dhcp completed"
 }
 
 ipconfig () {
@@ -161,7 +162,8 @@ cleanup () {
 
     echo "restoring WSL 2 ip route..."
     ip addr add $WSL2_VM_IP/255.255.255.0 dev $WSL2_TAP_NAME
-    ip route add default via $WSL2_GATEWAY_IP dev $WSL2_TAP_NAME
+    route del default
+    route add default gw $(cat /etc/resolv.conf | sed -r 's/[^0-9]([0-9]+.[0-9]+.[0-9]+.[0-9]+)./\1/g')
     echo "restored WSL 2 ip route"
 }
 
